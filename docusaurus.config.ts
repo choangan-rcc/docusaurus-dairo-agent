@@ -5,7 +5,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 const config: Config = {
   title: 'DAIRO AI Orchestrator',
   tagline: 'Agent-as-a-Service Platform',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/logo-mark.svg',
 
   future: {
     v4: true,
