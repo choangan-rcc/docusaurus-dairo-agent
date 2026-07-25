@@ -11,11 +11,13 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'https://dairo.example.com',
-  baseUrl: '/',
+  url: 'https://choangan-rcc.github.io',
+  baseUrl: '/docusaurus-dairo-agent/',
 
-  organizationName: 'dairo',
-  projectName: 'dairo-ai-orchestrator',
+  organizationName: 'choangan-rcc',
+  projectName: 'docusaurus-dairo-agent',
+  deploymentBranch: 'gh-pages',
+  trailingSlash: false,
 
   onBrokenLinks: 'throw',
 
