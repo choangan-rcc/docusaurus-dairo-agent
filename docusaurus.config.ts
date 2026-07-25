@@ -5,7 +5,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 const config: Config = {
   title: 'DAIRO AI Orchestrator',
   tagline: 'Agent-as-a-Service Platform',
-  favicon: 'img/logo-mark.svg',
+  favicon: 'img/favicon.png',
 
   future: {
     v4: true,
@@ -43,7 +43,8 @@ const config: Config = {
 
   themeConfig: {
     colorMode: {
-      respectPrefersColorScheme: true,
+      defaultMode: 'light',
+      respectPrefersColorScheme: false,
     },
     navbar: {
       title: 'DAIRO AI Orchestrator',
