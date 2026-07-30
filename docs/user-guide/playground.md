@@ -22,6 +22,19 @@ stored and browsable.
 Conversations can be renamed and deleted from the conversation list; deleting a
 conversation removes all of its messages permanently.
 
+### Long-term memory in a conversation
+
+That per-conversation history is *working* memory. Separately,
+[long-term memory](/docs/user-guide/memory) carries durable facts about you
+between conversations, and each conversation has two switches over it:
+
+- **Read** — off means this conversation answers without recalling anything.
+- **Learn** — off means nothing said here is remembered later. Turning it back on
+  skips whatever was said while it was off, rather than back-filling it.
+
+Both default to on (when memory is enabled for the deployment, the agent, and
+you).
+
 ## What you see during a turn
 
 - **Streaming text** — the reply renders token by token.
@@ -37,10 +50,14 @@ conversation removes all of its messages permanently.
 
 ## Human-in-the-loop approvals
 
-If a tool is marked **requires approval** on the agent, the conversation pauses
-just before that tool runs. An approval card appears showing the tool name and
-the exact arguments the model wants to use, with **Approve** and **Deny**
-actions (and an optional reason).
+If a tool is gated behind approval, the conversation pauses just before that tool
+runs. An approval card appears showing the tool name and the exact arguments the
+model wants to use, with **Approve** and **Deny** actions (and an optional
+reason).
+
+A tool can be gated on the **agent** (built-in tools), on a
+[data source](/docs/user-guide/data-sources) (where write-capable operations are
+gated automatically), or on an [MCP server](/docs/user-guide/mcp-servers).
 
 - **Approve** — the tool runs and the turn resumes streaming where it left off.
 - **Deny** — the tool is *not* run; the model is told the call was denied (plus

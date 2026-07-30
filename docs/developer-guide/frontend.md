@@ -14,15 +14,34 @@ Tailwind CSS v4, and using TanStack Query for server state. It lives in
 ```
 frontend/src/
   api/                  # shared HTTP client + cross-cutting types
+  app/                  # App routes, Layout chrome, nav data module
+  i18n/                 # i18next setup + locales/<lang>/<namespace>.json
   features/<feature>/   # one folder per backend surface
 ```
 
-- **`src/api/`** — the shared HTTP client (sets the Basic auth header and handles
-  the platform's error envelope) plus cross-cutting types.
+- **`src/api/`** — the shared HTTP client: attaches the JWT bearer token and the
+  active `X-Workspace-Id` header, transparently refreshes an expired access token,
+  emits an `api-unauthorized` event when auth is unrecoverable, and unwraps the
+  platform's error envelope into a typed `ApiError`.
+- **`src/app/`** — routing and chrome. `nav.ts` is a **pure data module** (nav
+  groups, icons, labels as i18n keys) so it can be unit-tested without i18n or
+  router setup.
 - **`src/features/<feature>/`** — one folder per backend surface: `agents`,
-  `playground`, `knowledge-bases`, `mcp-servers`, `model-configs`,
-  `model-routers`, `patterns`, `observability`, and `auth`. Each feature folder
-  owns its own `api.ts`, `types.ts`, pages, and components.
+  `playground`, `patterns`, `knowledge-bases`, `data-sources`, `mcp-servers`,
+  `model-configs`, `model-routers`, `guardrails`, `observability`, `usage`,
+  `memories`, `workspaces`, `settings`, and `auth`. Each feature folder owns its
+  own `api.ts`, `types.ts`, pages, and components.
+
+## Internationalization
+
+`src/i18n/` configures i18next with **statically bundled** JSON resources — one
+namespace per feature area (`common`, `nav`, `auth`, `agents`), one folder per
+locale under `locales/`. Nine languages ship today (`en`, `vi`, `ja`, `ko`, `zh`,
+`hi`, `ms`, `es`, `pt-BR`), with `en` as the fallback. The choice persists in
+`localStorage["lang"]`, the same idiom as the theme.
+
+Adding a language is a new folder under `locales/` plus an entry in `LANGUAGES`;
+adding a namespace is a new JSON in **every** locale plus a key in `resources`.
 
 ## Pure logic is plain TypeScript
 

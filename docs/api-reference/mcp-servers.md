@@ -45,6 +45,7 @@ is a `422 validation_error`.
 | `server_type` | string | `sse`, `streamable_http`, or `stdio`. |
 | `config` | object | The stored transport config. |
 | `discovered_tools` | array | Cached tool catalog: `{ name, description, input_schema }`. Empty until the first successful discovery. |
+| `approval_tool_names` | array\<string\> | Tools on this server that pause a turn for human approval. See [Approval gating](#approval-gating). |
 | `status` | string | `pending` (not yet discovered), `active` (discovery succeeded), or `error` (last discovery/connection failed). |
 | `created_at` / `updated_at` | string | ISO-8601 timestamps. |
 
@@ -82,8 +83,9 @@ Fetch a single server. Unknown id returns `404`.
 
 ## `PATCH /v1/mcp-servers/{mcp_server_id}`
 
-Partially update a server (`name`, `description`, `server_type`, `config` — all
-optional). **Changing `config` invalidates the previous discovery**: `status`
+Partially update a server (`name`, `description`, `server_type`, `config`,
+`approval_tool_names` — all optional). **Changing `config` invalidates the
+previous discovery**: `status`
 resets to `pending` and `discovered_tools` clears to `[]`, so run discovery
 again before the server's tools can be used.
 
@@ -107,6 +109,18 @@ curl -H "Authorization: Bearer $TOKEN" -X POST \
 
 **Response** `200` — the refreshed server object with populated
 `discovered_tools`.
+
+## Approval gating
+
+`approval_tool_names` on the **server** (settable on create and update) marks
+tools that pause a turn for human approval before they run — the gate lives with
+the connection rather than on each agent, so registering a server once carries
+its risk profile to every agent that attaches it.
+
+`agents.approval_tool_names` covers built-in tools only and **rejects** MCP tool
+names; put them here instead. At run time a gated tool emits an
+`approval-required` event — see
+[Human-in-the-loop approvals](/docs/api-reference/chat#human-in-the-loop-approvals).
 
 ## Attaching servers to agents
 

@@ -107,10 +107,17 @@ data: {"type": "done", "done": true, "usage": {"tokens_in": 18, "tokens_out": 3,
 
 ## Human-in-the-loop approvals
 
-When a tool listed in the agent's `approval_tool_names` is about to run, the
-turn pauses: the stream emits `approval-required` and closes, and a pending
-approval is persisted server-side (durable across disconnects) with a **15-minute
-TTL**.
+When a gated tool is about to run, the turn pauses: the stream emits
+`approval-required` and closes, and a pending approval is persisted server-side
+(durable across disconnects) with a **15-minute TTL**.
+
+A tool is gated by whichever object owns it:
+
+| Tool kind | Gate lives on |
+| --- | --- |
+| Built-in tools | `approval_tool_names` on the [agent](/docs/api-reference/agents). |
+| MCP server tools | `approval_tool_names` on the [MCP server](/docs/api-reference/mcp-servers#approval-gating). |
+| Data source tools | `approval_tool_names` on the [data source](/docs/api-reference/data-sources#approval-gating). |
 
 ### `POST /v1/agents/{agent_id}/playground/approvals/{approval_id}`
 
@@ -152,6 +159,8 @@ Paginated list of an agent's conversations, most-recent first.
 | `title` | string \| null | Optional display title. |
 | `channel` | string | `playground` or `agent` (API-driven turns). |
 | `message_count` | integer | Total messages (user + assistant). |
+| `memory_read_enabled` | boolean | Whether turns in this conversation may read [long-term memory](/docs/api-reference/memories). Default `true`. |
+| `memory_write_enabled` | boolean | Whether this conversation is learned from. Default `true`. |
 | `created_at` / `updated_at` | string | ISO-8601 timestamps. |
 
 ### `GET /v1/agents/{agent_id}/conversations/{conversation_id}`
@@ -162,7 +171,43 @@ different agent — return `404`.
 ### `PATCH /v1/agents/{agent_id}/conversations/{conversation_id}`
 
 Rename a conversation: `{ "title": "Billing question" }` (≤ 255 chars;
-`"title": null` clears it).
+`"title": null` clears it). Memory switches are **not** set here — they have
+their own endpoints below.
+
+## Memory toggles
+
+Two per-conversation switches over [long-term memory](/docs/api-reference/memories).
+Both return the same shape:
+
+```json
+{
+  "conversation_id": "conv_5d6e7f80",
+  "memory_read_enabled": true,
+  "memory_write_enabled": false
+}
+```
+
+### `PUT /v1/agents/{agent_id}/conversations/{conversation_id}/memory/read`
+
+**Request body:** `{ "enabled": false }`
+
+Off means this conversation's turns answer without reading memory. Learning is
+unaffected and nothing is deleted.
+
+### `PUT /v1/agents/{agent_id}/conversations/{conversation_id}/memory/write`
+
+**Request body:** `{ "enabled": false }`
+
+Off means this conversation is not learned from. Turning it back **on**
+fast-forwards the conversation's extraction watermark — anything said while it was
+off (including a burst still inside the debounce window) is never extracted, and
+learning resumes from now.
+
+:::note
+These are the conversation-level switches. Memory also has to be allowed by the
+platform flags, the subject's own switches, and the agent's `memory_config` — see
+[Memories](/docs/api-reference/memories#per-conversation-and-per-agent-controls).
+:::
 
 ### `DELETE /v1/agents/{agent_id}/conversations/{conversation_id}`
 
@@ -181,5 +226,5 @@ Paginated message history.
 | `role` | string | `user`, `assistant`, or `system`. |
 | `content` | string | Message text. |
 | `model` | string \| null | Model that produced the message (assistant), or `null`. |
-| `trace` | object \| null | Telemetry: tokens, latency, model, stop reason, tool calls, routing. |
+| `trace` | object \| null | Telemetry: tokens, latency, model, stop reason, tool calls, routing, and — when memory was injected — a `memories` array of the memory ids used, in injection order. Resolve them with [`GET /v1/memories/me?ids=…`](/docs/api-reference/memories). |
 | `created_at` | string | ISO-8601 timestamp. |

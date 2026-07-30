@@ -31,9 +31,19 @@ workspace-scoped.
 | `pattern_config` | object | Normalized pattern config (validated against the pattern schema). |
 | `pattern_version` | integer | Pattern code version snapshotted at write time. |
 | `tool_names` | array\<string\> | Enabled built-in tool names. |
-| `approval_tool_names` | array\<string\> | Tools requiring human approval before each call (must be a subset of `tool_names`). |
+| `approval_tool_names` | array\<string\> | **Built-in** tools requiring human approval before each call (must be a subset of `tool_names`). MCP and data-source tool names are rejected here — they are gated on their own connection. |
 | `guardrails` | object | Guardrails config (see below). |
+| `memory_config` | object | Long-term memory options (see below). |
 | `created_at` / `updated_at` | string | ISO-8601 timestamps. |
+
+**Memory config object** (`memory_config`)
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `enable_memory` | boolean | `true` | Per-agent opt-out of [long-term memory](/docs/api-reference/memories). The platform flags and the subject's own switches still apply on top. |
+| `memory_isolated` | boolean | `false` | `true` = the agent neither reads nor writes the shared workspace tier; everything it learns stays in its own silo. For sensitive domains. |
+
+Agents created before this field existed report the defaults.
 
 **Guardrails object** (`guardrails`)
 
@@ -107,8 +117,9 @@ Create an agent. Two modes:
 | `pattern_id` | string | `function_agent` | Must exist and be enabled (`422`). |
 | `pattern_config` | object | `{}` | Validated against the pattern schema; stored normalized. |
 | `tool_names` | array\<string\> | `["calculator", "current_time"]` | Unknown names rejected (`422`). |
-| `approval_tool_names` | array\<string\> | `[]` | Must be a subset of `tool_names` (`422`). |
+| `approval_tool_names` | array\<string\> | `[]` | Must be a subset of `tool_names` (`422`). Built-in tools only. |
 | `guardrails` | object | *(defaults)* | |
+| `memory_config` | object | `{ "enable_memory": true, "memory_isolated": false }` | |
 
 `status` cannot be set on create — new agents always start as `draft`.
 
@@ -160,6 +171,17 @@ bucket. **Response** `204`.
 Deep-copy an agent's configuration into a new `draft` named
 `Copy of <original name>`. **Response** `201` — the new agent (fresh `id`,
 `status: "draft"`, its own version 1).
+
+## Attached resources
+
+An agent's capabilities beyond its built-in `tool_names` come from attachments,
+each managed on its own agent-scoped routes:
+
+| Resource | Routes |
+| --- | --- |
+| Knowledge bases | `GET`/`POST /v1/agents/{id}/knowledge-bases`, `DELETE .../{kb_id}` — see [Knowledge Bases](/docs/api-reference/knowledge-bases) |
+| MCP servers | `GET`/`POST /v1/agents/{id}/mcp-servers`, `DELETE .../{mcp_server_id}` — see [MCP Servers](/docs/api-reference/mcp-servers) |
+| Data sources | `GET`/`POST /v1/agents/{id}/data-sources`, `DELETE .../{ds_id}` — see [Data Sources](/docs/api-reference/data-sources) |
 
 ## Agent versions
 

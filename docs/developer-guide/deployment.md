@@ -176,10 +176,62 @@ Per environment (`development`, `staging`, `production`):
    | --- | --- |
    | `KUBE_CONFIG` | base64-encoded kubeconfig, RBAC-scoped to this env's namespace only — not cluster-admin |
    | `DATABASE_URL` | see the DNS table above |
-   | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | app Basic-auth admin credential |
+   | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | legacy Basic-auth admin credential (only used when `ENABLE_LEGACY_BASIC_AUTH=true`) |
    | `ANTHROPIC_API_KEY` | per-environment key |
+   | `CREDENTIAL_ENCRYPTION_KEY` | AES key for stored BYOK model keys **and** data-source credentials. Required before either feature works. |
+
+   The chart's secret keys are `DATABASE_URL`, `ADMIN_USERNAME`,
+   `ADMIN_PASSWORD`, `ANTHROPIC_API_KEY`, `CREDENTIAL_ENCRYPTION_KEY`,
+   `EMBEDDING_API_KEY`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, and `PHOENIX_API_KEY`
+   — the same names an External Secrets store must use as its JSON property
+   names.
 
 4. **Real hostname** in `charts/agentic-platform/values-<env>.yaml`.
+
+## Enabling the background worker
+
+The arq worker (`worker.enabled=true`, plus `config.INGEST_QUEUE=arq`) runs the
+same image as the backend with `arq …WorkerSettings` instead of uvicorn. It owns
+document ingestion **and** the long-term-memory tasks, so it is required — not
+optional — for two features:
+
+| Feature | Requirement |
+| --- | --- |
+| Knowledge-base ingestion surviving API restarts | `INGEST_QUEUE=arq` + worker enabled |
+| Long-term memory **learning** | Same. Under the in-process queue, extraction is a no-op and the API honestly reports learning as unavailable. |
+
+Memory **reading** needs no worker — it happens inside the turn.
+
+Jobs carry only ids and are replayable, so multiple replicas and restarts are
+safe.
+
+## Feature configuration
+
+Both of these are off or absent by default; turn them on per environment through
+`config` (non-secret) and `secrets`.
+
+**Long-term memory** — see the [full flag table](/docs/api-reference/memories#configuration):
+
+```yaml
+config:
+  INGEST_QUEUE: "arq"
+  MEMORY_ENABLED: "true"
+  MEMORY_WORKSPACE_ALLOWLIST: "ws_pilotteam"   # empty = every workspace
+```
+
+Roll out with the allowlist first; the platform-wide kill switches
+(`MEMORY_ENABLED`, `MEMORY_READ_ENABLED`) are env-flag + restart in v1.
+
+**Workspace invites** — `FRONTEND_BASE_URL` must be the environment's real
+public URL, because it is the base of every invite link handed out by the API. The
+default (`http://localhost:5173`) produces links that only work on a developer's
+machine. `INVITE_TTL_SECONDS` controls how long a link lives (default 7 days).
+
+**Data source connectors** — `CREDENTIAL_ENCRYPTION_KEY` is required (it encrypts
+connection credentials as well as BYOK model keys); without it, connecting a data
+source fails with `credential_encryption_misconfigured`. The connectors launch
+pinned packages with `uvx` from inside the backend/worker container, so egress to
+the package index and to the target database must be allowed.
 
 ## Releasing to production
 
@@ -192,6 +244,12 @@ git push origin v1.2.3
 
 ## Known gaps (deliberate, MVP-stage)
 
+- **`JWT_SECRET` has no chart secret key yet.** The app **refuses to boot** outside
+  a local environment with the default or an empty secret, but the chart's Secret
+  template doesn't carry the key — so today it has to arrive via `config`
+  (a ConfigMap, i.e. not a secret) or a hand-managed Secret. Add it to
+  `templates/secret.yaml` and `values.yaml` before treating any environment as
+  production.
 - **No Postgres backups.** Single replica, no PITR. Required before real
   production data: pgBackRest or a `pg_dump` CronJob shipping to MinIO.
 - **`KUBE_CONFIG` is a long-lived credential.** Mitigate by scoping each

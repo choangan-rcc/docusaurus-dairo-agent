@@ -97,6 +97,45 @@ Then apply the database migrations:
 uv run alembic upgrade head
 ```
 
+## Optional: features that need extra setup
+
+Two features are off (or unusable) with the bare defaults.
+
+### Data sources
+
+Connecting a [data source](/docs/user-guide/data-sources) stores encrypted
+credentials, so a master key is required:
+
+```bash
+# Generate one:
+#   python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"
+CREDENTIAL_ENCRYPTION_KEY=<base64 32 bytes>
+```
+
+The connectors are launched with `uvx`, which downloads the pinned connector
+package on first use — so the machine running the backend needs network access to
+the Python package index, plus reachability to the database you're connecting.
+
+### Long-term memory
+
+[Memory](/docs/user-guide/memory) is off by default, and **learning** additionally
+requires the arq worker (which needs Redis, from `make infra-up`):
+
+```bash
+MEMORY_ENABLED=true
+INGEST_QUEUE=arq
+REDIS_URL=redis://localhost:6379
+```
+
+Then run the worker alongside the API in a third terminal:
+
+```bash
+make worker
+```
+
+Without the worker, reading memory still works but nothing new is ever learned —
+**Settings → Memory & privacy** will say so rather than pretending otherwise.
+
 ## Next steps
 
 With the backend and frontend running, the next step is to create your first agent

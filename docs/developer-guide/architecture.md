@@ -35,17 +35,18 @@ through environment variables alone.
 
 ## Key conventions
 
-### Org-scoped repository layer
+### Workspace-scoped repository layer
 
 Feature code **never queries models directly**. All database access goes through the
-repository layer in `database/repository.py`. A repository is constructed with an
-`org_id`, and every query it issues filters on that `org_id`.
+repository layer in `database/repository.py`. A repository is constructed with a
+`workspace_id`, and every query it issues filters on that `workspace_id` — this is
+the multi-tenancy insurance, not a convention.
 
-The platform currently runs in single-workspace mode against a seeded
-`org_default` workspace, but every table already carries `org_id`. When
-multi-tenancy lands, the only change needed is how the `OrgId` dependency in
-`api/deps.py` resolves the organization from the authenticated principal — no
-feature code changes.
+Feature routes depend on `WorkspaceId` from `api/deps.py`: the caller's active
+workspace, resolved from the bearer token plus the `X-Workspace-Id` header
+validated against membership (falling back to the user's earliest membership).
+Because scoping is mandatory in the repository, a cross-tenant id surfaces as a
+`404`, never a `403`.
 
 ### Single error envelope
 
@@ -60,8 +61,12 @@ See the [API Reference](/docs/api-reference/overview) for the full error-code ta
 
 ### Authentication
 
-All `/v1` routes require HTTP Basic admin auth; `/health` and `/ready` are
-unauthenticated and mounted at the root.
+`/v1` routes require a **JWT bearer token** (`security/tokens.py`, with
+server-side session rows so logout and revocation take effect). The auth flows
+themselves and `/health` / `/ready` are unauthenticated; the latter two are
+mounted at the root. A shared-credential HTTP Basic mode survives as a legacy
+escape hatch behind `ENABLE_LEGACY_BASIC_AUTH`, disabled by default — its
+principal is synthetic, workspace-blind, and deliberately has no memory subject.
 
 ### The registry idiom
 
@@ -115,20 +120,42 @@ the internal layout may evolve.
 | Package | Responsibility |
 | --- | --- |
 | `llm/` | Provider catalog, BYOK key verification, model resolution, and intelligent routing (model routers pick a model per request). |
-| `ingestion/` | Knowledge-base document pipeline (parse → chunk → embed → index). Queue is in-process by default, or arq/Redis with `INGEST_QUEUE=arq`; under arq the worker owns the stale-job sweep. |
+| `ingestion/` | Knowledge-base document pipeline (parse → chunk → embed → index) **and the arq worker** (`ingestion/worker.py`), which also hosts the memory tasks. Queue is in-process by default, or arq/Redis with `INGEST_QUEUE=arq`; under arq the worker owns the stale-job sweep and the nightly memory crons. |
+| `datasources/` | Data-source connectors: the curated provider catalog (`templates.py`, registered via the registry idiom), the AES-GCM credential vault, template rendering, and live connection validation. Ships **no tool code** — every provider is a third-party MCP server launched from a version-pinned template. See [Data Sources](/docs/api-reference/data-sources). |
+| `memory/` | Long-term memory. `retrieval.py` is the synchronous, fail-open read path; `pipeline.py` the async extract → embed → consolidate write path; plus `store.py` (mandatory `(workspace, subject)` filters), `scope.py` (category → scope whitelist, assigned by code and never by the LLM), `gates.py` (feature gates shared by both paths), `prompts.py`, and `queue.py`. See [Memories](/docs/api-reference/memories). |
 | `vectordb/` | Pluggable vector stores (Chroma, OpenSearch), selected via settings. |
 | `embeddings/` | Pluggable embeddings backends (including `fake` for CI). |
 | `storage/` | Pluggable blob storage (local filesystem, S3/MinIO). |
 | `security/crypto.py` | AES-256-GCM encryption for stored BYOK keys (`CREDENTIAL_ENCRYPTION_KEY`). API responses only ever expose a masked `key_hint`. |
 | `observability.py` | Arize Phoenix tracing, gated by `PHOENIX_ENABLED` (off by default). `api/observability.py` serves trace data to the frontend. |
 
+## Background worker
+
+With `INGEST_QUEUE=arq`, one worker process
+(`arq agentic_platform.ingestion.worker.WorkerSettings`) owns all deferred work:
+
+| Task | Trigger |
+| --- | --- |
+| `ingest_document` / `delete_document` | Enqueued by the knowledge-base routes. |
+| `extract_memories` | Enqueued after a chat turn, debounced per conversation (`MEMORY_EXTRACT_DEBOUNCE_S`). |
+| `sweep_stale` | Cron every 5 minutes — re-claims stranded ingestion jobs. |
+| `sweep_memory_extractions` | Nightly cron (03:30) — re-enqueues conversations whose extraction watermark lags, which is how a dropped enqueue self-heals. |
+| `purge_memory_superseded` | Nightly cron (04:15) — hard-deletes superseded memories older than 90 days. |
+
+The memory **write path only runs under arq**: with the default in-process queue,
+extraction is a no-op and `GET /v1/memories/state` honestly reports learning as
+unavailable.
+
 ## API surface
 
 All feature routes are mounted under `/v1` and wired together in `api/router.py`:
-`agents` (plus templates, duplicate, and the playground chat with SSE streaming),
-`model-configs`, `model-routers`, `patterns`, `mcp-servers`, `knowledge-bases`
-(plus per-agent attachment routers), `providers/{provider}/models`, `tools`, and
-`observability`. Interactive OpenAPI docs are served at `/docs`.
+`auth`, `workspaces` (plus members and invites), `agents` (plus templates,
+duplicate, versions, and the playground chat with SSE streaming and approval
+resolution), `model-configs`, `model-routers`, `patterns`, `mcp-servers`,
+`data-sources` and `data-source-providers`, `knowledge-bases`, `memories`
+(plus per-agent attachment routers for KBs, MCP servers, and data sources),
+`providers/{provider}/models`, `tools`, `guardrails/settings`, `usage/overview`,
+and `observability`. Interactive OpenAPI docs are served at `/docs`.
 
 ## Tests
 

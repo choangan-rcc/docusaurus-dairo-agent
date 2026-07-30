@@ -50,6 +50,38 @@ curl -X POST http://localhost:8000/v1/auth/register \
 
 Duplicate email returns `409` with code `conflict`.
 
+## `POST /v1/auth/accept-invite`
+
+Redeem a [workspace invite](/docs/api-reference/workspaces#invitations) token.
+Unauthenticated — this is the endpoint behind the emailed
+`/invite/accept?token=…` link, and it handles both a brand-new invitee and one
+who already has an account.
+
+**Request body**
+
+| Field | Type | Required | Constraints |
+| --- | --- | --- | --- |
+| `token` | string | Yes | The invite token from the link. |
+| `password` | string | Conditional | 8–128 chars. Required only when the invited email has **no** account yet. |
+| `display_name` | string | Conditional | 1–255 chars. Same condition as `password`. |
+
+Two outcomes, distinguished by `status`:
+
+| `status` | When | Response |
+| --- | --- | --- |
+| `registered` | The invited email had no account. One is created (email taken from the invite, not the body) and joined to the workspace. | `{ status, workspace_id, tokens: { access_token, refresh_token, user } }` |
+| `joined_existing_account` | The email already has an account. Membership is granted, but **no tokens are issued** — holding an invite link must never log anyone into an existing account. The invitee signs in with their own password. | `{ status, workspace_id, tokens: null }` |
+
+```bash
+curl -X POST http://localhost:8000/v1/auth/accept-invite \
+  -H 'Content-Type: application/json' \
+  -d '{"token": "…", "password": "a-strong-password", "display_name": "Teammate"}'
+```
+
+An invalid, expired, or already-used invite returns `404`. A new-account invite
+missing `password`/`display_name` returns `422`. The invite is marked accepted on
+success, so the link is single-use.
+
 ## `POST /v1/auth/login`
 
 Exchange email/password for a token pair. Returns the same shape as register.
@@ -121,6 +153,32 @@ The caller's profile and workspace memberships.
 }
 ```
 
+## `PATCH /v1/auth/me`
+
+Update your own profile — display name only for now.
+
+**Request body:** `{ "display_name": "New Name" }` (1–255 chars)
+
+**Response** `200`: `{ "id": "usr_1a2b3c4d", "email": "you@example.com", "display_name": "New Name" }`
+
+## `POST /v1/auth/change-password`
+
+Change your password after re-verifying the current one. Requires a bearer token.
+
+**Request body**
+
+| Field | Type | Required | Constraints |
+| --- | --- | --- | --- |
+| `current_password` | string | Yes | Must match your current password. |
+| `new_password` | string | Yes | 8–128 chars. |
+
+**Response** `204`. A wrong current password returns **`400
+invalid_current_password`**, deliberately not `401` — clients treat any `401` as
+an expired session and would bounce you to the login page.
+
+Existing sessions are **not** revoked by a password change; revoke them from
+`DELETE /v1/auth/sessions/{session_id}` if that's what you want.
+
 ## Configuration
 
 | Env var | Default | Purpose |
@@ -129,4 +187,6 @@ The caller's profile and workspace memberships.
 | `JWT_ACCESS_TTL_SECONDS` | `1800` | Access-token lifetime. |
 | `JWT_REFRESH_TTL_SECONDS` | `2592000` | Refresh-token lifetime (30 days). |
 | `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` / `BOOTSTRAP_ADMIN_DISPLAY_NAME` | — | Seed a first real user into the default workspace at boot. |
+| `INVITE_TTL_SECONDS` | `604800` | Workspace-invite lifetime (7 days). |
+| `FRONTEND_BASE_URL` | `http://localhost:5173` | Base of the `invite_url` returned when inviting members. |
 | `ENABLE_LEGACY_BASIC_AUTH` | `false` | Temporary escape hatch: accept shared-credential HTTP Basic (`ADMIN_USERNAME` / `ADMIN_PASSWORD`). The legacy admin is workspace-blind (bound to the default workspace). |

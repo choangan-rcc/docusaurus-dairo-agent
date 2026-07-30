@@ -72,10 +72,28 @@ Each enabled tool also has a **"requires approval"** toggle. Tools marked this
 way pause the conversation and wait for a human decision before every call —
 see [Playground](/docs/user-guide/playground#human-in-the-loop-approvals).
 
-Agents can get two more kinds of tools beyond this list: a knowledge-base
-retrieval tool (attach a KB — see
-[Knowledge Bases](/docs/user-guide/knowledge-bases)) and MCP tools (attach an
-MCP server — see [MCP Servers](/docs/user-guide/mcp-servers)).
+Agents can get three more kinds of tools beyond this list:
+
+- a **knowledge-base retrieval** tool — attach a KB (see
+  [Knowledge Bases](/docs/user-guide/knowledge-bases));
+- **data-source** tools — attach a connected database (see
+  [Data Sources](/docs/user-guide/data-sources));
+- **MCP** tools — attach an MCP server (see
+  [MCP Servers](/docs/user-guide/mcp-servers)).
+
+For those three, the approval gate lives on the **connection**, not here: a data
+source or MCP server carries its own list of tools that require approval, so the
+gate follows the connection to every agent that uses it.
+
+### Memory
+
+Two per-agent switches over [long-term memory](/docs/user-guide/memory):
+
+- **Use memory** — off means this agent neither recalls nor learns facts, whatever
+  the platform and personal settings say.
+- **Isolated** — the agent keeps everything it learns in its own silo, and doesn't
+  read the shared workspace-wide facts (language, addressing, timezone, response
+  style). For sensitive domains.
 
 ### Guardrails
 

@@ -1,5 +1,5 @@
 ---
-sidebar_position: 14
+sidebar_position: 16
 title: Error Codes
 ---
 
@@ -17,6 +17,7 @@ Every error uses the [error envelope](/docs/api-reference/overview#error-envelop
 | `unauthorized` | 401 | Missing, invalid, or expired credentials. |
 | `forbidden` | 403 | Authenticated but not allowed — e.g. `X-Workspace-Id` names a workspace you're not a member of. |
 | `conflict` | 409 | Uniqueness conflict — e.g. registering an email that already exists. |
+| `invalid_current_password` | 400 | `POST /v1/auth/change-password` with the wrong current password. Deliberately not `401`, which clients read as an expired session. |
 | `internal_error` | 500 | Unhandled server error. |
 | `not_ready` | 503 | `GET /ready` — database unreachable. |
 
@@ -71,6 +72,24 @@ because the `200` stream is already open.
 | --- | --- | --- |
 | `mcp_discovery_failed` | 502 | Could not connect to the MCP server during `/discover`. |
 | `mcp_unknown_tools` | 422 | Attach request named tools not in `discovered_tools`; run discovery first. |
+
+## Data sources
+
+| Code | HTTP | When it happens |
+| --- | --- | --- |
+| `datasource_validation_failed` | 422 | Submitted values don't match the provider descriptor; duplicate data source name; approval/attach request named tools not in `discovered_tools`. |
+| `datasource_auth_failed` | 422 | The backing system rejected the supplied credentials. |
+| `datasource_unreachable` | 422 | Spawn/connect/timeout failure before the credentials were judged. |
+| `datasource_disabled` | 409 | Operation attempted on a disabled or disconnected source. |
+| `datasource_provider_unknown` | 500 | A stored row (or request) names a provider this build no longer ships. |
+
+:::note
+A **failed connection probe is not an error response** — `POST /v1/data-sources`
+and `/test` return `200`/`201` with `status: "failed"` and a fixed
+`status_reason`, so the connection can be repaired without retyping secrets.
+Provider/driver text is never forwarded, only classified into one of five
+phrases. See [Data Sources](/docs/api-reference/data-sources#statuses).
+:::
 
 ## Knowledge bases
 
