@@ -5,7 +5,7 @@ title: Getting Started
 
 # Getting Started
 
-This page walks through running DAIRO AI Orchestrator locally, with the platform's
+This page walks through running DAIRO AI Factory locally, with the platform's
 zero-config defaults, and then optionally pointing it at a real LLM provider and a
 fuller local infrastructure stack.
 

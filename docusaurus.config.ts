@@ -3,7 +3,7 @@ import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
-  title: 'DAIRO AI Orchestrator',
+  title: 'DAIRO AI Factory',
   tagline: 'Agent-as-a-Service Platform',
   favicon: 'img/favicon.png',
 
@@ -47,9 +47,9 @@ const config: Config = {
       respectPrefersColorScheme: false,
     },
     navbar: {
-      title: 'DAIRO AI Orchestrator',
+      title: 'DAIRO AI Factory',
       logo: {
-        alt: 'DAIRO AI Orchestrator Logo',
+        alt: 'DAIRO AI Factory Logo',
         src: 'img/logo-mark.svg',
       },
       items: [

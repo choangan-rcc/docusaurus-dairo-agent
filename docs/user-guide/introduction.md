@@ -5,7 +5,7 @@ title: Introduction
 
 # Introduction
 
-DAIRO AI Orchestrator is an **Agent-as-a-Service (AaaS) platform**: it lets you build,
+DAIRO AI Factory is an **Agent-as-a-Service (AaaS) platform**: it lets you build,
 configure, test, and serve AI agents as a managed service, rather than wiring up
 prompts and integrations by hand for every project. The platform is made up of a
 Python/FastAPI backend and a React/Vite frontend that together provide a single place
